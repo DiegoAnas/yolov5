@@ -36,6 +36,7 @@ def detect(save_img=False):
         model.half()  # to FP16
 
     # Second-stage classifier
+    # TODO remove
     classify = False
     if classify:
         modelc = load_classifier(name='resnet101', n=2)  # initialize
@@ -72,9 +73,12 @@ def detect(save_img=False):
 
         # Apply NMS
         pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)
+        # Returns:
+        # detections with shape: nx6 (x1, y1, x2, y2, conf, cls)
         t2 = time_synchronized()
 
         # Apply Classifier
+        # TODO remove
         if classify:
             pred = apply_classifier(pred, modelc, img, im0s)
 
@@ -94,11 +98,12 @@ def detect(save_img=False):
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
 
                 # Print results
-                for c in det[:, -1].unique():
-                    n = (det[:, -1] == c).sum()  # detections per class
-                    s += '%g %ss, ' % (n, names[int(c)])  # add to string
+                for cls in det[:, -1].unique():
+                    n = (det[:, -1] == cls).sum()  # detections per class
+                    s += '%g %ss, ' % (n, names[int(cls)])  # add to string
 
                 # Write results
+                detection_count = 0
                 for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
@@ -109,6 +114,14 @@ def detect(save_img=False):
                     if save_img or view_img:  # Add bbox to image
                         label = '%s %.2f' % (names[int(cls)], conf)
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=3)
+
+                    # ROI saves have the bounding box contours.
+                    write_ROI = True
+                    if write_ROI:
+                        x1, y1, x2, y2 = [int(coord.numpy()) for coord in xyxy]
+                        detection_roi = im0[y1:y2, x1:x2]
+                        cv2.imwrite(f"{str(save_path)}_{names[int(cls)]}_{detection_count}.png", detection_roi)
+                        detection_count += 1
 
             # Print time (inference + NMS)
             print('%sDone. (%.3fs)' % (s, t2 - t1))
