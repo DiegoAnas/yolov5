@@ -16,7 +16,8 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized
 
 
 def detect(save_img=False):
-    source, weights, view_img, save_txt, imgsz = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size
+    source, weights, view_img, save_txt, imgsz, save_roi = opt.source, opt.weights, opt.view_img, opt.save_txt, \
+                                                           opt.img_size, opt.save_roi
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://'))
 
@@ -89,6 +90,7 @@ def detect(save_img=False):
             else:
                 p, s, im0 = Path(path), '', im0s
 
+            original = im0 # if we don't keep a copy, saved ROIs show edges of bounding boxes
             save_path = str(save_dir / p.name)
             txt_path = str(save_dir / 'labels' / p.stem) + ('_%g' % dataset.frame if dataset.mode == 'video' else '')
             s += '%gx%g ' % img.shape[2:]  # print string
@@ -116,10 +118,10 @@ def detect(save_img=False):
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=3)
 
                     # ROI saves have the bounding box contours.
-                    write_ROI = True
-                    if write_ROI:
+                    #write_ROI = True
+                    if save_roi:
                         x1, y1, x2, y2 = [int(coord.numpy()) for coord in xyxy]
-                        detection_roi = im0[y1:y2, x1:x2]
+                        detection_roi = original[y1:y2, x1:x2]
                         cv2.imwrite(f"{str(save_path)}_{names[int(cls)]}_{detection_count}.png", detection_roi)
                         detection_count += 1
 
@@ -173,6 +175,7 @@ if __name__ == '__main__':
     parser.add_argument('--project', default='runs/detect', help='save results to project/name')
     parser.add_argument('--name', default='exp', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
+    parser.add_argument('--save-roi', action='store_true', help='detections are saved as separte image')
     opt = parser.parse_args()
     print(opt)
 
