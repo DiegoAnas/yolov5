@@ -24,6 +24,9 @@ def detect(save_img=False):
     # Directories
     save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+    if save_roi:
+        roi_path = Path(increment_path(save_dir / opt.roi_dir, exist_ok=opt.exist_ok))
+        roi_path.mkdir(parents=True, exist_ok=True)
 
     # Initialize
     set_logging()
@@ -90,7 +93,6 @@ def detect(save_img=False):
             else:
                 p, s, im0 = Path(path), '', im0s
 
-            original = im0 # if we don't keep a copy, saved ROIs show edges of bounding boxes
             save_path = str(save_dir / p.name)
             txt_path = str(save_dir / 'labels' / p.stem) + ('_%g' % dataset.frame if dataset.mode == 'video' else '')
             s += '%gx%g ' % img.shape[2:]  # print string
@@ -98,14 +100,15 @@ def detect(save_img=False):
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
-
                 # Print results
                 for cls in det[:, -1].unique():
                     n = (det[:, -1] == cls).sum()  # detections per class
                     s += '%g %ss, ' % (n, names[int(cls)])  # add to string
 
                 # Write results
-                detection_count = 0
+                detection_count = 0 #TODO find some numbering that will work for the saved ROIs
+                if save_roi:
+                    original = im0.copy()  # if we don't keep a copy, saved ROIs show edges of bounding boxes
                 for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
@@ -118,11 +121,11 @@ def detect(save_img=False):
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=3)
 
                     # ROI saves have the bounding box contours.
-                    #write_ROI = True
                     if save_roi:
                         x1, y1, x2, y2 = [int(coord.numpy()) for coord in xyxy]
                         detection_roi = original[y1:y2, x1:x2]
-                        cv2.imwrite(f"{str(save_path)}_{names[int(cls)]}_{detection_count}.png", detection_roi)
+                        # this_roi_path = roi_path / f"{p.name}_{names[int(cls)]}_{detection_count}.png"
+                        cv2.imwrite(str(roi_path / f"{p.name}_{names[int(cls)]}_{detection_count}.png"), detection_roi)
                         detection_count += 1
 
             # Print time (inference + NMS)
@@ -172,10 +175,11 @@ if __name__ == '__main__':
     parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--update', action='store_true', help='update all models')
-    parser.add_argument('--project', default='runs/detect', help='save results to project/name')
-    parser.add_argument('--name', default='exp', help='save results to project/name')
+    parser.add_argument('--project', default='runs/detect', help='save results to project/name') # TODO change this savepaths to something more intuitive
+    parser.add_argument('--name', default='results', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--save-roi', action='store_true', help='detections are saved as separte image')
+    parser.add_argument('--roi-dir', default='rois', help='save results to project/name/roi-dir')
     opt = parser.parse_args()
     print(opt)
 
